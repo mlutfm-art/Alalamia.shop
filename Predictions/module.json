@@ -1,0 +1,11 @@
+{
+    "name": "Predictions",
+    "alias": "predictions",
+    "description": "Sports Match Predictions module with Admin Panel, Leaderboard & API",
+    "keywords": ["predictions", "sports", "matches", "leaderboard"],
+    "priority": 0,
+    "providers": [
+        "Modules\\Predictions\\app\\Providers\\PredictionsServiceProvider"
+    ],
+    "files": []
+}

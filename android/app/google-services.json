@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "771867184256",
+    "project_id": "alalamia-412d4",
+    "storage_bucket": "alalamia-412d4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:771867184256:android:4d0d2b70b088107043aa65",
+        "android_client_info": {
+          "package_name": "com.alalamia.shop"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "771867184256-if6mfjf207q3nmj99r7sc90h2hdl7qgd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.alalamia.shop",
+            "certificate_hash": "a2ee9568526f89ddc47e77eab7114871815f6ef5"
+          }
+        },
+        {
+          "client_id": "771867184256-5csq7gblrbqp3nduh0d1t0n1j1hbmfp9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCh15hj1SF23M6MyuQ1n4ziUaVOPC3nVZM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "771867184256-5csq7gblrbqp3nduh0d1t0n1j1hbmfp9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
