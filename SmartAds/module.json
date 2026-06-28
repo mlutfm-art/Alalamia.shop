@@ -1,0 +1,13 @@
+{
+    "name": "SmartAds",
+    "alias": "smartads",
+    "description": "Smart Engagement Engine — Ads, Notifications, Banners, Social Actions for 6Valley",
+    "keywords": ["smartads","engagement","notifications","banners","flutter"],
+    "priority": 0,
+    "providers": [
+        "Modules\\SmartAds\\app\\Providers\\SmartAdsServiceProvider",
+        "Modules\\SmartAds\\app\\Providers\\RouteServiceProvider"
+    ],
+    "files": [],
+    "requires": []
+}

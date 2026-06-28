@@ -1,0 +1,391 @@
+<?php
+
+namespace Modules\SmartAds\app\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Category;
+use App\Models\Product;
+use App\Utils\Helpers;
+use App\Utils\ImageManager;
+use Brian2694\Toastr\Facades\Toastr;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Modules\SmartAds\app\Models\SmartAd;
+use Modules\SmartAds\app\Models\SmartAdNotification;
+use Modules\SmartAds\app\Services\ActionResolverService;
+use Modules\SmartAds\app\Services\EngagementFlowService;
+
+class SmartAdController extends Controller
+{
+    public function __construct(
+        private readonly EngagementFlowService $flowService,
+        private readonly ActionResolverService  $resolver,
+    ) {}
+
+    /*──────────────────────────────────────────────────────────────
+     | CRUD
+     ──────────────────────────────────────────────────────────────*/
+
+    public function index(Request $request)
+    {
+        $search = $request['search'];
+        $ads = SmartAd::query()->whereNull('parent_id');
+
+        if ($request->filled('search')) {
+            $key = explode(' ', $request['search']);
+            $ads->where(function ($q) use ($key) {
+                foreach ($key as $v) { $q->orWhere('title', 'like', "%{$v}%"); }
+            });
+        }
+        if ($request->filled('ad_type')) {
+            $ads->where('ad_type', $request['ad_type']);
+        }
+        if ($request->filled('action_type')) {
+            $ads->whereJsonContains('action_data->type', $request['action_type']);
+        }
+
+        $ads = $ads->latest()->paginate(Helpers::pagination_limit())->appends($request->query());
+        return view('smartads::admin.index', compact('ads', 'search'));
+    }
+
+    public function create()
+    {
+        $products    = Product::active()->get();
+        $categories  = Category::where(['position' => 0])->get();
+        $parents     = SmartAd::whereNull('parent_id')->latest()->get(['id', 'title']);
+        return view('smartads::admin.create', compact('products', 'categories', 'parents'));
+    }
+
+    public function store(Request $request)
+    {
+        $request->validate($this->rules());
+        try {
+            $ad = new SmartAd();
+            $this->fillAd($ad, $request);
+            $ad->status = 1;
+            $ad->save();
+
+            $this->flowService->trigger($ad, [
+                'send_push' => $request->boolean('send_push_now', true) && is_null($ad->parent_id),
+                'topic'     => $request->input('push_topic', config('smartads.default_push_topic')),
+            ]);
+
+            Toastr::success('تم إضافة الإعلان بنجاح!');
+            return redirect()->route('admin.smartads.index');
+        } catch (\Throwable $e) {
+            Toastr::error('حدث خطأ: ' . $e->getMessage());
+            return back()->withInput();
+        }
+    }
+
+    public function edit($id)
+    {
+        $ad         = SmartAd::findOrFail($id);
+        $products   = Product::active()->get();
+        $categories = Category::where(['position' => 0])->get();
+        $parents    = SmartAd::whereNull('parent_id')->where('id', '!=', $id)->latest()->get(['id', 'title']);
+        return view('smartads::admin.edit', compact('ad', 'products', 'categories', 'parents'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        $request->validate($this->rules());
+        try {
+            $ad = SmartAd::findOrFail($id);
+            $this->fillAd($ad, $request, true);
+            $ad->save();
+
+            if ($request->boolean('retrigger_push', false)) {
+                $this->flowService->trigger($ad, [
+                    'send_push' => true,
+                    'topic'     => $request->input('push_topic', config('smartads.default_push_topic')),
+                ]);
+            }
+
+            Toastr::success('تم تحديث الإعلان بنجاح!');
+            return redirect()->route('admin.smartads.index');
+        } catch (\Throwable $e) {
+            Toastr::error('حدث خطأ: ' . $e->getMessage());
+            return back()->withInput();
+        }
+    }
+
+    public function delete(Request $request)
+    {
+        $ad = SmartAd::find($request->id);
+        if (!$ad) return response()->json(['success' => 0], 404);
+
+        if ($ad->image) ImageManager::delete('smartads/' . $ad->image);
+        if ($ad->video) Storage::disk('public')->delete('smartads/videos/' . $ad->video);
+
+        foreach ($ad->variants as $v) {
+            if ($v->image) ImageManager::delete('smartads/' . $v->image);
+            if ($v->video) Storage::disk('public')->delete('smartads/videos/' . $v->video);
+            $v->delete();
+        }
+        $ad->delete();
+        return response()->json(['success' => 1]);
+    }
+
+    public function status_update(Request $request)
+    {
+        $ad = SmartAd::find($request->id);
+        if (!$ad) return response()->json(['success' => 0], 404);
+        $ad->update(['status' => $request->status]);
+        return response()->json(['success' => 1]);
+    }
+
+    public function analytics($id)
+    {
+        $ad     = SmartAd::with('variants')->findOrFail($id);
+        $winner = $ad->winner();
+        return view('smartads::admin.analytics', compact('ad', 'winner'));
+    }
+
+    /*──────────────────────────────────────────────────────────────
+     | مركز الإشعارات (Admin View)
+     ──────────────────────────────────────────────────────────────*/
+
+    public function notificationsPage(Request $request)
+    {
+        $query = SmartAdNotification::active()->latest();
+
+        if ($request->filled('display_type')) {
+            $query->forDisplay($request->display_type);
+        }
+        if ($request->boolean('unread_only')) {
+            $query->unread();
+        }
+
+        $notifications = $query->paginate(20)->appends($request->query());
+        $unreadCount   = SmartAdNotification::active()->unread()->count();
+
+        return view('smartads::admin.notifications', compact('notifications', 'unreadCount'));
+    }
+
+    /*──────────────────────────────────────────────────────────────
+     | إرسال Push يدوي
+     ──────────────────────────────────────────────────────────────*/
+
+    public function sendPush(Request $request, $id)
+    {
+        $ad = SmartAd::findOrFail($id);
+        $result = $this->flowService->trigger($ad, [
+            'send_push' => true,
+            'topic'     => $request->input('topic', config('smartads.default_push_topic')),
+            'user_ids'  => $request->input('user_ids', []),
+        ]);
+        return response()->json(['success' => true, 'result' => $result]);
+    }
+
+    /*──────────────────────────────────────────────────────────────
+     | ✅ إرسال إشعار Push مباشر (جديد)
+     ──────────────────────────────────────────────────────────────*/
+
+    /**
+     * إرسال إشعار Push عبر HTTP API (يعمل على أي استضافة)
+     */
+    public function sendPushNotification(Request )
+{
+    ([
+        "title" => "required|string|max:255",
+        "body"  => "required|string|max:1000",
+        "token" => "required|string",
+        "link"  => "nullable|url|max:500"
+    ]);
+
+     = env("FCM_SERVER_KEY");
+
+     = [
+        "to" => ,
+        "notification" => [
+            "title" => ,
+            "body"  => ,
+        ],
+        "data" => [
+            "click_action" =>  ?? url("/"),
+        ],
+        "android" => [
+            "priority" => "high"
+        ]
+    ];
+
+     = Http::withHeaders([
+        "Authorization" => "key=".,
+        "Content-Type"  => "application/json",
+    ])->post("https://fcm.googleapis.com/fcm/send", );
+
+    return response()->json([
+        "success" => (),
+        "fcm_response" => ()
+    ]);
+}return response()->json([
+                'success' => false,
+                'message' => 'فشل الإرسال: ' . ($result['results'][0]['error'] ?? 'خطأ غير معروف')
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'فشل الاتصال بخادم Firebase: ' . $response->body()
+        ], 500);
+    }
+
+    /*──────────────────────────────────────────────────────────────
+     | حقول Action ديناميكية (للـ Admin API)
+     ──────────────────────────────────────────────────────────────*/
+
+    public function actionFields($type)
+    {
+        return response()->json(['fields' => ActionResolverService::requiredFields($type)]);
+    }
+
+    /*──────────────────────────────────────────────────────────────
+     | Helpers الداخلية
+     ──────────────────────────────────────────────────────────────*/
+
+    private function rules(): array
+    {
+        return [
+            'title'       => 'required|string|max:191',
+            'ad_type'     => 'required|in:banner,popup,notification,video,native',
+            'placement'   => 'required|string',
+            'image'       => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
+            'video_file'  => 'nullable|file|mimetypes:video/mp4,video/webm,video/quicktime|max:20480',
+            'device_type' => 'nullable|in:all,android,ios,web',
+        ];
+    }
+
+    private function fillAd(SmartAd $ad, Request $request, bool $isUpdate = false): void
+    {
+        $ad->title     = $request->title;
+        $ad->ad_type   = $request->ad_type;
+        $ad->placement = $request->placement;
+
+        // ── صورة ──────────────────────────────────────────────────
+        if ($request->hasFile('image')) {
+            $ad->image = $isUpdate && $ad->image
+                ? ImageManager::update('smartads/', $ad->image, 'webp', $request->file('image'))
+                : ImageManager::upload('smartads/', 'webp', $request->file('image'));
+        }
+
+        // ── فيديو ─────────────────────────────────────────────────
+        if ($request->hasFile('video_file')) {
+            $file = $request->file('video_file');
+            $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+            Storage::disk('public')->putFileAs('smartads/videos', $file, $filename);
+            if ($isUpdate && $ad->video && !str_starts_with($ad->video, 'http')) {
+                Storage::disk('public')->delete('smartads/videos/' . $ad->video);
+            }
+            $ad->video = $filename;
+        } elseif ($request->filled('video_url')) {
+            $ad->video = $request->video_url;
+        }
+
+        // ── action_data الموسّع ────────────────────────────────────
+        $actionType = $request->action_type;
+        $payload    = $this->buildPayload($actionType, $request);
+
+        $ad->action_data = [
+            'type'             => $actionType,
+            'payload'          => $payload,
+            'button_text'      => $request->button_text       ?? 'اعرف أكثر',
+            'background_color' => $request->background_color  ?? '#ffffff',
+            'text_color'       => $request->text_color        ?? '#212121',
+            'subtitle'         => $request->subtitle          ?? '',
+            'description'      => $request->description       ?? '',
+            'target'           => $request->action_target     ?? null,
+            'extra'            => $request->extra ? json_decode($request->extra, true) : null,
+        ];
+
+        // ── A/B ───────────────────────────────────────────────────
+        $ad->parent_id  = $request->parent_id  ?: null;
+        $ad->ab_variant = $request->ab_variant  ?: null;
+
+        // ── استهداف ──────────────────────────────────────────────
+        $ad->target_category_id = $request->target_category_id ?: null;
+        $ad->target_region      = $request->target_region      ?: null;
+        $ad->device_type        = $request->device_type        ?: 'all';
+
+        // ── جدولة ────────────────────────────────────────────────
+        $ad->start_at = $request->start_at ?: null;
+        $ad->end_at   = $request->end_at   ?: null;
+    }
+
+    /**
+     * بناء payload كل نوع إجراء من حقول الـ form.
+     */
+    private function buildPayload(string $type, Request $request): array
+    {
+        return match(true) {
+            in_array($type, ['product','category','brand']) => [
+                'id'   => $request->action_id,
+                'slug' => $request->action_slug,
+            ],
+            $type === 'deals'           => ['filter'  => $request->action_deals_filter ?? 'all'],
+            $type === 'wallet'          => ['tab'     => $request->action_wallet_tab ?? 'balance'],
+            $type === 'order_tracking'  => ['order_id'=> $request->action_order_id],
+            $type === 'account_settings'=> ['section' => $request->action_settings_section ?? 'main'],
+            in_array($type, ['facebook_follow','instagram_follow','tiktok_follow','x_follow','telegram_join','youtube_subscribe']) => [
+                'profile_id'  => $request->action_profile_id,
+                'profile_url' => $request->action_profile_url,
+            ],
+            in_array($type, ['facebook_like_post','instagram_like_post','telegram_view_post']) => [
+                'post_id'    => $request->action_post_id,
+                'channel_id' => $request->action_channel_id,
+                'post_url'   => $request->action_post_url,
+            ],
+            $type === 'whatsapp_chat'  => [
+                'phone'   => preg_replace('/[^0-9]/', '', $request->action_phone ?? ''),
+                'message' => $request->action_message,
+            ],
+            $type === 'save_contact'   => [
+                'name'      => $request->action_contact_name,
+                'phone'     => $request->action_phone,
+                'company'   => $request->action_contact_company,
+                'email'     => $request->action_contact_email,
+                'website'   => $request->action_contact_website,
+                'vcard_url' => $request->action_vcard_url,
+            ],
+            $type === 'survey'         => ['survey_url' => $request->action_survey_url],
+            $type === 'feedback'       => ['order_id' => $request->action_order_id, 'subject' => $request->subtitle],
+            $type === 'invite_friend'  => [
+                'referral_code' => $request->action_referral_code,
+                'reward_points' => $request->action_reward_points ?? 0,
+                'share_message' => $request->action_share_message,
+            ],
+            $type === 'loyalty_points' => ['action' => $request->action_loyalty_action ?? 'view'],
+            $type === 'api_post'       => [
+                'endpoint'        => $request->action_api_endpoint,
+                'method'          => $request->action_api_method ?? 'POST',
+                'body'            => $request->action_api_body ? json_decode($request->action_api_body, true) : [],
+                'auth'            => true,
+                'success_message' => $request->action_api_success_message,
+            ],
+            $type === 'apply_coupon'   => [
+                'code'        => strtoupper($request->action_coupon_code ?? ''),
+                'auto_apply'  => $request->boolean('action_auto_apply', true),
+            ],
+            $type === 'copy_to_clipboard' => [
+                'text'  => $request->action_clipboard_text,
+                'label' => $request->action_clipboard_label,
+            ],
+            $type === 'notify_admin'   => [
+                'subject' => $request->action_notify_subject,
+                'body'    => $request->action_notify_body,
+            ],
+            in_array($type, ['external_url','inapp_browser']) => [
+                'url'          => $request->action_target,
+                'title'        => $request->action_browser_title,
+                'show_toolbar' => true,
+            ],
+            $type === 'app_store_rate' => [
+                'android_package' => $request->action_android_package ?: config('smartads.android_package'),
+                'ios_app_id'      => $request->action_ios_app_id ?: config('smartads.ios_app_id'),
+            ],
+            default => ['target' => $request->action_target],
+        };
+    }
+}

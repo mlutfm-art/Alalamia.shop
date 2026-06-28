@@ -20,18 +20,20 @@ class _SmartAdBannerWidgetState extends State<SmartAdBannerWidget> {
   Widget build(BuildContext context) {
     return Consumer<AdController>(
       builder: (context, adController, child) {
-        // Find first active ad matching the requested placement
-        final List<SmartAdModel> ads = adController.activeAds
-            .where((ad) => ad.placement == widget.placement)
-            .toList();
+        // منطق ذكي للبحث: تطابق تام أو إعلان "home" عام كاحتياطي
+        final List<SmartAdModel> ads = adController.activeAds.where((ad) {
+          bool exactMatch = ad.placement == widget.placement;
+          bool fallbackMatch = (widget.placement.startsWith('home') && ad.placement == 'home');
+          return exactMatch || fallbackMatch;
+        }).toList();
 
         if (ads.isEmpty) {
           return const SizedBox.shrink();
         }
 
         final ad = ads.first;
+        debugPrint("SmartAds: Found ad [ID: ${ad.id}] for placement: ${widget.placement}");
 
-        // Trigger impression once when the widget is rendered
         if (!_impressionTracked && ad.id != null) {
           _impressionTracked = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -43,63 +45,39 @@ class _SmartAdBannerWidgetState extends State<SmartAdBannerWidget> {
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              )
-            ],
+            color: ad.backgroundColor != null ? Color(int.parse(ad.backgroundColor!.replaceFirst('#', '0xFF'))) : Colors.transparent,
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: InkWell(
               onTap: () async {
-                if (ad.id != null) {
-                  adController.trackClick(ad.id!);
-                }
+                if (ad.id != null) adController.trackClick(ad.id!);
                 if (ad.url != null && ad.url!.isNotEmpty) {
                   try {
-                    final Uri uri = Uri.parse(ad.url!);
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    }
-                  } catch (e) {
-                    debugPrint("Could not launch ad URL: $e");
-                  }
+                    await launchUrl(Uri.parse(ad.url!), mode: LaunchMode.externalApplication);
+                  } catch (e) { debugPrint("SmartAds Launch Error: $e"); }
                 }
               },
               child: Stack(
                 children: [
-                  ad.image != null && ad.image!.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: ad.image!,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: 120,
-                          placeholder: (context, url) => Container(
-                            height: 120,
-                            color: Colors.grey[200],
-                            child: const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => _buildPlaceholderAd(ad),
-                        )
-                      : _buildPlaceholderAd(ad),
+                  if (ad.image != null && ad.image!.isNotEmpty)
+                    CachedNetworkImage(
+                      imageUrl: ad.image!,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: 120,
+                      placeholder: (context, url) => Container(height: 120, color: Colors.grey[100]),
+                      errorWidget: (context, url, error) => _buildPlaceholder(ad),
+                    )
+                  else
+                    _buildPlaceholder(ad),
+                  
                   Positioned(
-                    top: 8,
-                    right: 8,
+                    top: 8, right: 8,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        "إعلان",
-                        style: TextStyle(color: Colors.white, fontSize: 10),
-                      ),
+                      decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), borderRadius: BorderRadius.circular(4)),
+                      child: const Text("إعلان", style: TextStyle(color: Colors.white, fontSize: 8)),
                     ),
                   ),
                 ],
@@ -111,50 +89,12 @@ class _SmartAdBannerWidgetState extends State<SmartAdBannerWidget> {
     );
   }
 
-  Widget _buildPlaceholderAd(SmartAdModel ad) {
-    final theme = Theme.of(context);
+  Widget _buildPlaceholder(SmartAdModel ad) {
     return Container(
-      width: double.infinity,
-      height: 120,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.primaryColor.withOpacity(0.85),
-            theme.primaryColor.withOpacity(0.6),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
+      width: double.infinity, height: 100,
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (ad.title != null)
-            Text(
-              ad.title!,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          const SizedBox(height: 6),
-          if (ad.description != null)
-            Text(
-              ad.description!,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 12,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-        ],
-      ),
+      alignment: Alignment.center,
+      child: Text(ad.title ?? '', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, color: ad.textColor != null ? Color(int.parse(ad.textColor!.replaceFirst('#', '0xFF'))) : Colors.black)),
     );
   }
 }
