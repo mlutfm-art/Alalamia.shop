@@ -144,7 +144,7 @@ class AppConstants {
 
   // SmartAds Endpoints
   static const String smartAdsFcmTokenSaveUri = '/api/v1/smartads/fcm/token/save';
-  static const String smartAdsGetActiveUri = '/api/v1/smartads/get-active/home';
+  static const String smartAdsGetActiveUri = '/api/v1/smartads/get-active/all';
   static const String smartAdsTrackImpressionUri = '/api/v1/smartads/track-impression';
   static const String smartAdsTrackClickUri = '/api/v1/smartads/track-click';
   static const String smartAdsPendingBannersUri = '/api/v1/smartads/banners/pending';
@@ -154,6 +154,7 @@ class AppConstants {
   static const String botQueryUri = '/api/v1/bot/query';
   static const String botConversationUri = '/api/v1/bot/conversation';
   static const String botFeedbackUri = '/api/v1/bot/feedback';
+  static const String botQuickActionsUri = '/api/v1/bot/quick-actions';
 
   //address
   static const String updateAddressUri = '/api/v1/customer/address/update';

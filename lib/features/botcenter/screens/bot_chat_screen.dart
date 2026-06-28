@@ -20,7 +20,9 @@ class _BotChatScreenState extends State<BotChatScreen> with TickerProviderStateM
   @override
   void initState() {
     super.initState();
-    Provider.of<BotController>(context, listen: false).setCurrentPage('bot_chat');
+    final botCtrl = Provider.of<BotController>(context, listen: false);
+    botCtrl.setCurrentPage('bot_chat');
+    botCtrl.loadQuickActions();
   }
 
   @override
@@ -158,9 +160,9 @@ class _BotChatScreenState extends State<BotChatScreen> with TickerProviderStateM
             ),
           ),
 
-          // Input Area
+          // Input Area - Fixed Overflow Issue
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             decoration: BoxDecoration(
               color: theme.cardColor,
               boxShadow: [
@@ -172,35 +174,35 @@ class _BotChatScreenState extends State<BotChatScreen> with TickerProviderStateM
               ],
             ),
             child: SafeArea(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey[100],
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: TextField(
-                        controller: _messageController,
-                        focusNode: _focusNode,
-                        textDirection: TextDirection.rtl,
-                        maxLines: 4,
-                        minLines: 1,
-                        decoration: InputDecoration(
-                          hintText: 'اكتب رسالتك هنا...',
-                          hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.5)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                          border: InputBorder.none,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey[100],
+                          borderRadius: BorderRadius.circular(24),
                         ),
-                        onSubmitted: (_) => _sendMessage(),
+                        child: TextField(
+                          controller: _messageController,
+                          focusNode: _focusNode,
+                          textDirection: TextDirection.rtl,
+                          maxLines: 4,
+                          minLines: 1,
+                          decoration: InputDecoration(
+                            hintText: 'اكتب رسالتك هنا...',
+                            hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.5)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                            border: InputBorder.none,
+                          ),
+                          onSubmitted: (_) => _sendMessage(),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Consumer<BotController>(
-                    builder: (context, bot, _) => AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      child: Material(
+                    const SizedBox(width: 8),
+                    Consumer<BotController>(
+                      builder: (context, bot, _) => Material(
                         color: bot.isBotTyping ? Colors.grey : primaryGradient1,
                         borderRadius: BorderRadius.circular(24),
                         child: InkWell(
@@ -213,8 +215,8 @@ class _BotChatScreenState extends State<BotChatScreen> with TickerProviderStateM
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -260,15 +262,18 @@ class _BotChatScreenState extends State<BotChatScreen> with TickerProviderStateM
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 30),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.center,
-                children: [
-                  _buildQuickAction('كيف أتابع طلبي؟', theme),
-                  _buildQuickAction('سياسة الإرجاع', theme),
-                  _buildQuickAction('طرق الدفع', theme),
-                ],
+              Consumer<BotController>(
+                builder: (context, botCtrl, _) {
+                  final actions = botCtrl.quickActions.isNotEmpty
+                      ? botCtrl.quickActions
+                      : ['كيف أتابع طلبي؟', 'سياسة الإرجاع', 'طرق الدفع'];
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: actions.map((a) => _buildQuickAction(a, theme)).toList(),
+                  );
+                },
               ),
             ],
           ),

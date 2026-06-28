@@ -25,6 +25,7 @@ import 'package:flutter_sixvalley_ecommerce/features/home/widgets/product_type_p
 import 'package:flutter_sixvalley_ecommerce/features/home/widgets/search_home_page_widget.dart';
 import 'package:flutter_sixvalley_ecommerce/features/notification/controllers/notification_controller.dart';
 import 'package:flutter_sixvalley_ecommerce/features/prediction/controllers/prediction_controller.dart';
+import 'package:flutter_sixvalley_ecommerce/features/prediction/widgets/prediction_banner_widget.dart';
 import 'package:flutter_sixvalley_ecommerce/features/botcenter/widgets/bot_header_icon_widget.dart';
 import 'package:flutter_sixvalley_ecommerce/features/product/controllers/product_controller.dart';
 import 'package:flutter_sixvalley_ecommerce/features/product/widgets/home_category_product_widget.dart';
@@ -33,6 +34,9 @@ import 'package:flutter_sixvalley_ecommerce/features/product/widgets/recommended
 import 'package:flutter_sixvalley_ecommerce/features/profile/controllers/profile_contrroller.dart';
 import 'package:flutter_sixvalley_ecommerce/features/shop/controllers/shop_controller.dart';
 import 'package:flutter_sixvalley_ecommerce/features/home/widgets/top_seller_widget.dart';
+import 'package:flutter_sixvalley_ecommerce/features/smartads/controllers/ad_controller.dart';
+import 'package:flutter_sixvalley_ecommerce/features/smartads/widgets/in_app_banner_dialog.dart';
+import 'package:flutter_sixvalley_ecommerce/features/smartads/widgets/smart_ad_banner_widget.dart';
 import 'package:flutter_sixvalley_ecommerce/features/splash/controllers/splash_controller.dart';
 import 'package:flutter_sixvalley_ecommerce/features/splash/domain/models/config_model.dart';
 import 'package:flutter_sixvalley_ecommerce/helper/responsive_helper.dart';
@@ -84,9 +88,12 @@ class HomePage extends StatefulWidget {
       productController.getRecommendedProduct();
       productController.getClearanceAllProductList(1, isUpdate: reload);
       
-      // Forced prediction data loading
       predictionController.getPredictionBanner();
       predictionController.getMatchList();
+
+      final adController = Provider.of<AdController>(Get.context!, listen: false);
+      adController.getActiveAds(device: "android", region: "SA");
+      adController.getPendingInAppBanners(null);
 
       if(notificationController.notificationModel == null || (notificationController.notificationModel != null && notificationController.notificationModel!.notification!.isEmpty) || reload) {
         notificationController.getNotificationList(1);
@@ -106,6 +113,20 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     singleVendor = Provider.of<SplashController>(context, listen: false).configModel?.businessMode == "single";
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final adController = Provider.of<AdController>(context, listen: false);
+      adController.getActiveAds(device: "android", region: "SA");
+      adController.getPendingInAppBanners(null).then((_) {
+        if (adController.pendingInAppBanners.isNotEmpty) {
+          showDialog(
+            context: context,
+            barrierDismissible: true,
+            builder: (context) => InAppBannerDialog(ad: adController.pendingInAppBanners.first),
+          );
+        }
+      });
+    });
   }
 
   Widget _buildSection({required Widget child, double? verticalPadding, bool hasMargin = true}) {
@@ -150,13 +171,25 @@ class _HomePageState extends State<HomePage> {
               centerTitle: false,
               automaticallyImplyLeading: false,
               backgroundColor: Theme.of(context).highlightColor,
-              title: Image.asset(Images.logoWithNameImage, height: 35),
-              // تم نقل الأيقونة لجهة الـ leading
-              leading: const Padding(
-                padding: EdgeInsets.only(left: 8),
-                child: Center(child: BotHeaderIconWidget()),
+              titleSpacing: 15,
+              title: Row(
+                children: [
+                  Image.asset(Images.logoWithNameImage, height: 35),
+                  const SizedBox(width: 10),
+                  const BotHeaderIconWidget(),
+                  const SizedBox(width: 6),
+                  Text(
+                    "بوت العملاء",
+                    style: textBold.copyWith(
+                      fontSize: 10,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                ],
               ),
             ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
             SliverToBoxAdapter(child: Provider.of<SplashController>(context, listen: false).configModel!.announcement!.status == '1'?
             Consumer<SplashController>(
@@ -172,12 +205,19 @@ class _HomePageState extends State<HomePage> {
               ),
             )),
 
+            // مسافة مريحة بعد شريط البحث
+            const SliverToBoxAdapter(child: SizedBox(height: 40)),
+
 
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.only(top: 15),
+                padding: const EdgeInsets.only(top: 0),
                 child: const BannersWidget(),
               ),
+            ),
+
+            SliverToBoxAdapter(
+              child: SmartAdBannerWidget(placement: 'home_top'),
             ),
 
 
@@ -310,6 +350,10 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
+
+            SliverToBoxAdapter(
+              child: SmartAdBannerWidget(placement: 'home_middle'),
+            ),
 
             SliverToBoxAdapter(
               child: _buildSection(

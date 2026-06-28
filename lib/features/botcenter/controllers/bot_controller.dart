@@ -16,10 +16,12 @@ class BotController extends ChangeNotifier {
   bool _isBotTyping = false;
   String? _sessionId;
   String _currentPage = 'home';
+  List<String> _quickActions = [];
 
   List<BotMessageModel> get messages => _messages;
   bool get isBotTyping => _isBotTyping;
   String get sessionId => _sessionId ?? '';
+  List<String> get quickActions => _quickActions;
 
   void setCurrentPage(String page) {
     _currentPage = page;
@@ -123,6 +125,34 @@ class BotController extends ChangeNotifier {
       if (index != -1) {
         _messages[index].feedback = rating;
         _messages[index].feedbackText = feedbackText;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> loadQuickActions() async {
+    ApiResponseModel apiResponse = await botService.getQuickActions();
+    if (apiResponse.response != null && apiResponse.response!.statusCode == 200) {
+      final data = apiResponse.response!.data;
+      List<String> actions = [];
+      if (data is Map<String, dynamic>) {
+        if (data['intents'] is List) {
+          for (var item in data['intents']) {
+            if (item['name'] != null) {
+              actions.add(item['name'].toString());
+            }
+          }
+        }
+        if (data['knowledge'] is List) {
+          for (var item in data['knowledge']) {
+            if (item['title'] != null) {
+              actions.add(item['title'].toString());
+            }
+          }
+        }
+      }
+      if (actions.isNotEmpty) {
+        _quickActions = actions;
         notifyListeners();
       }
     }

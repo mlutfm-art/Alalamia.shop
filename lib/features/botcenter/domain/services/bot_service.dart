@@ -20,4 +20,9 @@ class BotService implements BotServiceInterface {
   Future<ApiResponseModel> sendFeedback(int messageId, String rating, String? feedbackText) {
     return botRepository.sendFeedback(messageId, rating, feedbackText);
   }
+
+  @override
+  Future<ApiResponseModel> getQuickActions() {
+    return botRepository.getQuickActions();
+  }
 }

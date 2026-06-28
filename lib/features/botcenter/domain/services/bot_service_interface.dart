@@ -4,4 +4,5 @@ abstract class BotServiceInterface {
   Future<ApiResponseModel> queryBot(String message, int storeId, String sessionId, String pageContext);
   Future<ApiResponseModel> getConversationLog(String conversationId);
   Future<ApiResponseModel> sendFeedback(int messageId, String rating, String? feedbackText);
+  Future<ApiResponseModel> getQuickActions();
 }

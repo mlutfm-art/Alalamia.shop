@@ -57,4 +57,14 @@ class BotRepository implements BotRepositoryInterface {
       return ApiResponseModel.withError(ApiErrorHandler.getMessage(e));
     }
   }
+
+  @override
+  Future<ApiResponseModel> getQuickActions() async {
+    try {
+      Response response = await dioClient.get(AppConstants.botQuickActionsUri);
+      return ApiResponseModel.withSuccess(response);
+    } catch (e) {
+      return ApiResponseModel.withError(ApiErrorHandler.getMessage(e));
+    }
+  }
 }
