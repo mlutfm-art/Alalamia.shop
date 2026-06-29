@@ -14,6 +14,10 @@ use Modules\SmartAds\app\Models\SmartAd;
 use Modules\SmartAds\app\Services\ActionResolverService;
 use Modules\SmartAds\app\Services\EngagementFlowService;
 use Modules\SmartAds\app\Services\TargetingService;
+use Modules\Alertmarkting\app\Models\NotificationOccasion;
+use Modules\Alertmarkting\app\Models\NotificationGroup;
+use Modules\Alertmarkting\app\Models\ScheduledCampaign;
+use Modules\Alertmarkting\app\Models\ScheduledNotifLog;
 use Brian2694\Toastr\Facades\Toastr;
 
 class SmartAdController extends Controller
@@ -27,8 +31,6 @@ class SmartAdController extends Controller
     public function index(Request $request)
     {
         $ads = SmartAd::latest()->paginate(Helpers::pagination_limit());
-        
-        // 📊 إحصائيات كاملة لضمان عدم ظهور خطأ "total_sent" والمفاتيح الأخرى
         $stats = [
             'total'           => SmartAd::count(),
             'active'          => SmartAd::where('status', 1)->count(),
@@ -116,11 +118,63 @@ class SmartAdController extends Controller
         return response()->json(['success' => true, 'message' => 'تم الإرسال بنجاح', 'result' => $result]);
     }
 
-    // 🚀 دوال الصفحات الإضافية المطلوبة لتجنب خطأ 404
-    public function doseReminders() { return view("smartads::admin.dose-reminders"); }
-    public function groups() { return view("smartads::admin.groups"); }
-    public function occasions() { return view("smartads::admin.occasions"); }
-    public function segmentSend() { return view("smartads::admin.segment-send"); }
+    /**
+     * 💊 تذكير الجرعات
+     */
+    public function doseReminders()
+    {
+        $reminders = ScheduledCampaign::latest()->paginate(10);
+        $stats = [
+            'active' => ScheduledCampaign::where('is_active', 1)->count(),
+            'total_sent' => ScheduledNotifLog::where('status', 'sent')->count(),
+            'total_failed' => ScheduledNotifLog::where('status', 'failed')->count(),
+        ];
+        $recentLogs = ScheduledNotifLog::latest()->limit(5)->get();
+        return view("smartads::admin.dose-reminders", compact('reminders', 'stats', 'recentLogs'));
+    }
+
+    /**
+     * 👥 مجموعات الإرسال
+     */
+    public function groups()
+    {
+        $groups = NotificationGroup::latest()->paginate(10);
+        return view("smartads::admin.groups.index", compact('groups'));
+    }
+
+    /**
+     * 🗓️ المناسبات والأعياد
+     */
+    public function occasions()
+    {
+        $occasions = NotificationOccasion::latest()->paginate(10);
+        $types = [
+            'religious' => '🕌 دينية',
+            'national' => '🇾🇪 وطنية',
+            'social' => '🎉 اجتماعية',
+            'other' => '📌 أخرى'
+        ];
+        $nextOccasion = NotificationOccasion::where('date', '>=', now())->orderBy('date', 'asc')->first();
+        return view("smartads::admin.occasions", compact('occasions', 'types', 'nextOccasion'));
+    }
+
+    /**
+     * 🎯 إرسال حسب الفئة (Segments)
+     */
+    public function segmentSend()
+    {
+        $segments = [
+            'all' => ['🌎', 'جميع المستخدمين'],
+            'product_buyers' => ['📦', 'مشتري منتج معين'],
+            'category_buyers' => ['📂', 'مشتري قسم معين'],
+            'order_status' => ['🚚', 'حسب حالة الطلب'],
+            'price_range' => ['💰', 'حسب سلة المشتريات'],
+            'last_order_days' => ['🕒', 'منذ آخر طلب'],
+            'city' => ['📍', 'حسب المدينة'],
+        ];
+        $categories = Category::where('position', 0)->get();
+        return view("smartads::admin.segment-send", compact('segments', 'categories'));
+    }
 
     private function fillAd(SmartAd $ad, Request $request, $isUpdate = false)
     {
