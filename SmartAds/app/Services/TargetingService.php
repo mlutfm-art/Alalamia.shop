@@ -4,14 +4,12 @@ namespace Modules\SmartAds\app\Services;
 
 use App\Models\User;
 use App\Models\Order;
-use App\Models\Cart;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 
 class TargetingService
 {
     /**
-     * بناء استعلام المستخدمين المستهدفين بناءً على تكوين الاستهداف
+     * بناء استعلام المستخدمين المستهدفين بناءً على الفئة المختارة
      */
     public function buildTargetQuery(string $targetType, array $config, bool $onlyFcm = true): Builder
     {
@@ -21,53 +19,64 @@ class TargetingService
             $query->whereNotNull('cm_firebase_token')->where('cm_firebase_token', '!=', '');
         }
 
-        // ── 1. الاستهداف الجغرافي ──────────────────
-        if (!empty($config['countries'])) {
-            $query->whereIn('country', (array)$config['countries']);
-        }
-        if (!empty($config['cities'])) {
-            $query->whereIn('city', (array)$config['cities']);
-        }
-
-        // ── 2. الاستهداف السلوكي (Behavioral) ──────
         switch ($targetType) {
-            case 'abandoned_cart':
-                // مستخدمين لديهم سلة بها منتجات ولم يطلبوا منذ X ساعات
-                $hours = $config['hours'] ?? 24;
-                $query->whereHas('carts', function($q) use ($hours) {
-                    $q->where('updated_at', '<', now()->subHours($hours));
-                })->whereDoesntHave('orders', function($q) use ($hours) {
-                    $q->where('created_at', '>', now()->subHours($hours));
-                });
-                break;
-
-            case 'vip_customers':
-                // عملاء صرفوا أكثر من X ريال
-                $minSpend = $config['min_spend'] ?? 1000;
-                $query->whereHas('orders', function($q) use ($minSpend) {
-                    $q->select('customer_id')
-                      ->groupBy('customer_id')
-                      ->havingRaw('SUM(order_amount) >= ?', [$minSpend]);
-                });
-                break;
-
-            case 'inactive_users':
-                // لم يفتحوا التطبيق منذ X أيام
-                $days = $config['days'] ?? 30;
-                $query->where('last_active_at', '<', now()->subDays($days));
-                break;
-                
-            case 'product_interested':
-                // شاهدوا منتج معين أو صنف معين
-                if(!empty($config['category_id'])) {
-                    $query->whereJsonContains('interests', $config['category_id']);
+            case 'product_buyers':
+                if (!empty($config['product_id'])) {
+                    $query->whereHas('orders', function($q) use ($config) {
+                        $q->whereHas('details', function($sq) use ($config) {
+                            $sq->where('product_id', $config['product_id']);
+                        });
+                    });
                 }
                 break;
-        }
 
-        // ── 3. تصفية الأجهزة ──────────────────────
-        if (!empty($config['device_type']) && $config['device_type'] !== 'all') {
-            $query->where('device_type', $config['device_type']);
+            case 'category_buyers':
+                if (!empty($config['category_id'])) {
+                    $query->whereHas('orders', function($q) use ($config) {
+                        $q->whereHas('details', function($sq) use ($config) {
+                            $sq->whereHas('product', function($pq) use ($config) {
+                                $pq->where('category_id', $config['category_id']);
+                            });
+                        });
+                    });
+                }
+                break;
+
+            case 'city':
+                if (!empty($config['city'])) {
+                    $query->where('city', 'like', "%{$config['city']}%");
+                }
+                break;
+
+            case 'order_status':
+                if (!empty($config['order_status'])) {
+                    $query->whereHas('orders', function($q) use ($config) {
+                        $q->where('order_status', $config['order_status']);
+                    });
+                }
+                break;
+
+            case 'price_range':
+                $min = $config['min_price'] ?? 0;
+                $max = $config['max_price'] ?? 999999;
+                $query->whereHas('orders', function($q) use ($min, $max) {
+                    $q->select('customer_id')
+                      ->groupBy('customer_id')
+                      ->havingRaw('SUM(order_amount) BETWEEN ? AND ?', [$min, $max]);
+                });
+                break;
+
+            case 'last_order_days':
+                $days = $config['days'] ?? 30;
+                $query->whereHas('orders', function($q) use ($days) {
+                    $q->where('created_at', '>=', now()->subDays($days));
+                });
+                break;
+
+            case 'registered_days':
+                $days = $config['days'] ?? 30;
+                $query->where('created_at', '>=', now()->subDays($days));
+                break;
         }
 
         return $query;
