@@ -91,6 +91,7 @@ class HomePage extends StatefulWidget {
       predictionController.getPredictionBanner();
       predictionController.getMatchList();
 
+      // 🔥 جلب الإعلانات الذكية وتحديثها
       final adController = Provider.of<AdController>(Get.context!, listen: false);
       adController.getActiveAds(device: "android", region: "SA");
       adController.getPendingInAppBanners(null);
@@ -114,6 +115,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     singleVendor = Provider.of<SplashController>(context, listen: false).configModel?.businessMode == "single";
     
+    // 🔥 جلب الإعلانات الذكية وتفعيل الإعلان المنبثق تلقائياً
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final adController = Provider.of<AdController>(context, listen: false);
       adController.getActiveAds(device: "android", region: "SA");
@@ -175,7 +177,7 @@ class _HomePageState extends State<HomePage> {
               title: Row(
                 children: [
                   Image.asset(Images.logoWithNameImage, height: 35),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   const BotHeaderIconWidget(),
                   const SizedBox(width: 6),
                   Text(
@@ -206,7 +208,7 @@ class _HomePageState extends State<HomePage> {
             )),
 
             // مسافة مريحة بعد شريط البحث
-            const SliverToBoxAdapter(child: SizedBox(height: 40)),
+            const SliverToBoxAdapter(child: SizedBox(height: 55)),
 
 
             SliverToBoxAdapter(
@@ -216,6 +218,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
+            // 🔥 لافتة إعلانات سمارت الذكية (الأعلى)
             SliverToBoxAdapter(
               child: SmartAdBannerWidget(placement: 'home_top'),
             ),
@@ -351,6 +354,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
 
+            // 🔥 لافتة إعلانات سمارت الذكية (الوسطى)
             SliverToBoxAdapter(
               child: SmartAdBannerWidget(placement: 'home_middle'),
             ),

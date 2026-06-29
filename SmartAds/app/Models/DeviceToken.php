@@ -28,12 +28,13 @@ class DeviceToken extends Model
     }
 
     /**
-     * حفظ أو تحديث التوكن — يمنع التكرار
+     * حفظ أو تحديث التوكن — تم التعديل لدعم نوع الجهاز (Android/iOS)
      */
     public static function saveToken(
         string $token,
         ?int $userId = null,
         ?string $userType = null,
+        string $deviceType = 'unknown',
         string $browser = 'unknown'
     ): self {
         return static::updateOrCreate(
@@ -41,7 +42,7 @@ class DeviceToken extends Model
             [
                 'tokenable_id'   => $userId,
                 'tokenable_type' => $userType,
-                'device_type'    => 'web',
+                'device_type'    => $deviceType,
                 'browser'        => $browser,
                 'last_used_at'   => now(),
             ]

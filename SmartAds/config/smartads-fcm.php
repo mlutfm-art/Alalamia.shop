@@ -1,7 +1,9 @@
 <?php
 
 return [
-    'credentials_file'    => storage_path('app/smartads-service-account.json'),
+    // 🔥 تم التعديل ليشير إلى الملف الموجود داخل مجلد الموديول مباشرة
+    'credentials_file'    => __DIR__ . '/../smartads-service-account.json',
+    
     'api_key'             => env('FCM_API_KEY',        'AIzaSyAdpOWF9Au5C7qMdXAMbxx0nkBbRoaNztE'),
     'auth_domain'         => env('FCM_AUTH_DOMAIN',    'alalamia-412d4.firebaseapp.com'),
     'project_id'          => env('FCM_PROJECT_ID',     'alalamia-412d4'),

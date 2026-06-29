@@ -5,7 +5,8 @@ import 'package:flutter_sixvalley_ecommerce/common/basewidget/not_loggedin_widge
 import 'package:flutter_sixvalley_ecommerce/features/auth/controllers/auth_controller.dart';
 import 'package:flutter_sixvalley_ecommerce/features/profile/controllers/profile_contrroller.dart';
 import 'package:flutter_sixvalley_ecommerce/features/smartads/controllers/ad_controller.dart';
-import 'package:flutter_sixvalley_ecommerce/features/smartads/domain/models/smart_ad_model.dart';
+import 'package:flutter_sixvalley_ecommerce/features/smartads/domain/models/smart_ad_notification_model.dart';
+import 'package:flutter_sixvalley_ecommerce/helper/date_converter.dart';
 import 'package:flutter_sixvalley_ecommerce/helper/route_healper.dart';
 import 'package:flutter_sixvalley_ecommerce/localization/language_constrants.dart';
 import 'package:provider/provider.dart';
@@ -41,13 +42,7 @@ class _SmartAdNotificationScreenState extends State<SmartAdNotificationScreen> {
     return Scaffold(
       appBar: CustomAppBar(
         title: getTranslated('notification_center', context) ?? "مركز الإشعارات",
-        onBackPressed: () {
-          if (Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
-          } else {
-            RouterHelper.getDashboardRoute(action: RouteAction.pushReplacement);
-          }
-        },
+        onBackPressed: () => Navigator.of(context).pop(),
       ),
       body: !isLoggedIn
           ? NotLoggedInWidget(
@@ -68,18 +63,11 @@ class _SmartAdNotificationScreenState extends State<SmartAdNotificationScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.notifications_none_outlined,
-                          size: 64,
-                          color: theme.hintColor.withOpacity(0.5),
-                        ),
+                        Icon(Icons.notifications_none_outlined, size: 64, color: theme.hintColor.withOpacity(0.5)),
                         const SizedBox(height: 16),
                         Text(
                           getTranslated('no_notification', context) ?? "لا توجد إشعارات حالياً",
-                          style: TextStyle(
-                            color: theme.hintColor,
-                            fontSize: 16,
-                          ),
+                          style: TextStyle(color: theme.hintColor, fontSize: 16),
                         ),
                       ],
                     ),
@@ -92,10 +80,7 @@ class _SmartAdNotificationScreenState extends State<SmartAdNotificationScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     itemCount: adController.notifications.length,
                     separatorBuilder: (context, index) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final notification = adController.notifications[index];
-                      return _buildNotificationItem(notification, adController);
-                    },
+                    itemBuilder: (context, index) => _buildNotificationItem(adController.notifications[index], adController),
                   ),
                 );
               },
@@ -121,6 +106,7 @@ class _SmartAdNotificationScreenState extends State<SmartAdNotificationScreen> {
           if (notification.id != null && !isRead) {
             adController.markNotificationAsRead(notification.id!);
           }
+          // هنا يمكنك إضافة منطق SmartActionHelper.performAction إذا كان هناك payload
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -128,15 +114,12 @@ class _SmartAdNotificationScreenState extends State<SmartAdNotificationScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Image or Icon
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: notification.image != null && notification.image!.isNotEmpty
                     ? CachedNetworkImage(
                         imageUrl: notification.image!,
-                        height: 50,
-                        width: 50,
-                        fit: BoxFit.cover,
+                        height: 50, width: 50, fit: BoxFit.cover,
                         errorWidget: (context, url, error) => _buildPlaceholderIcon(),
                       )
                     : _buildPlaceholderIcon(),
@@ -152,44 +135,24 @@ class _SmartAdNotificationScreenState extends State<SmartAdNotificationScreen> {
                         Expanded(
                           child: Text(
                             notification.title ?? '',
-                            style: TextStyle(
-                              fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-                              fontSize: 14,
-                              color: theme.textTheme.bodyLarge?.color,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: isRead ? FontWeight.normal : FontWeight.bold, fontSize: 14),
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (!isRead)
-                          Container(
-                            height: 8,
-                            width: 8,
-                            decoration: BoxDecoration(
-                              color: theme.primaryColor,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
+                        if (!isRead) Container(height: 8, width: 8, decoration: BoxDecoration(color: theme.primaryColor, shape: BoxShape.circle)),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
                       notification.body ?? '',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: theme.hintColor),
+                      maxLines: 2, overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 6),
                     if (notification.createdAt != null)
                       Text(
-                        notification.createdAt!,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: theme.hintColor,
-                        ),
+                        DateConverter.localDateToIsoStringAMPM(notification.createdAt!),
+                        style: TextStyle(fontSize: 10, color: theme.hintColor),
                       ),
                   ],
                 ),
@@ -204,14 +167,8 @@ class _SmartAdNotificationScreenState extends State<SmartAdNotificationScreen> {
   Widget _buildPlaceholderIcon() {
     final theme = Theme.of(context);
     return Container(
-      height: 50,
-      width: 50,
-      color: theme.primaryColor.withOpacity(0.1),
-      child: Icon(
-        Icons.notifications_active_outlined,
-        color: theme.primaryColor,
-        size: 24,
-      ),
+      height: 50, width: 50, color: theme.primaryColor.withOpacity(0.1),
+      child: Icon(Icons.notifications_active_outlined, color: theme.primaryColor, size: 24),
     );
   }
 }

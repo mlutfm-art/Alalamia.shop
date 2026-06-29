@@ -1,440 +1,327 @@
-{{-- ══════════════════════════════════════════════════════════════
-     Smart Engagement Engine — Shared Form Partial (تصميم محسّن)
-══════════════════════════════════════════════════════════════ --}}
 @php
     $ad  = $ad  ?? null;
     $ac  = $ad?->action_data ?? [];
-    $p   = $ac['payload'] ?? [];
-    $currentActionType = $ac['type'] ?? '';
-    $targetType = $ac['target_type'] ?? 'all';
-    $targetValue = $ac['target_value'] ?? [];
+    $currentActionType = old('action_type', $ad->action_type ?? ($ac['type'] ?? 'product'));
+    $firebase = $ad?->firebase_payload ?? [];
+    $targeting = $ad?->targeting_config ?? [];
 @endphp
 
-{{-- ══ القسم 1: المعلومات الأساسية ══════════════════════════ --}}
-<div class="card mb-3">
-    <div class="card-header"><h5 class="mb-0"><i class="tio-settings-outlined mr-2"></i>المعلومات الأساسية</h5></div>
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-6">
-                <label class="form-label fw-semibold">العنوان <span class="text-danger">*</span></label>
-                <input type="text" name="title" class="form-control" value="{{ old('title', $ad->title ?? '') }}" required>
+<div class="row g-3 text-right" dir="rtl" id="enterprise-action-engine-container">
+    {{-- الجانب الأيمن: المحتوى والذكاء --}}
+    <div class="col-lg-8">
+        {{-- 1. المحتوى المرئي والتخصيص --}}
+        <div class="card mb-3 shadow-sm border-right-primary">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 text-primary"><i class="tio-edit mr-2"></i>المحتوى والتخصيص المتقدم</h5>
+                @if($ad?->is_ai_generated) <span class="badge badge-soft-info">ذكاء اصطناعي</span> @endif
             </div>
-            <div class="col-md-3">
-                <label class="form-label fw-semibold">نوع الإعلان <span class="text-danger">*</span></label>
-                <select name="ad_type" id="ad_type" class="form-control" required>
-                    @foreach(config('smartads.ad_types') as $t)
-                        <option value="{{ $t }}" @selected(old('ad_type', $ad->ad_type ?? 'banner') === $t)>
-                            {{ ucfirst($t) }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-semibold">الموضع <span class="text-danger">*</span></label>
-                <select name="placement" class="form-control" required>
-                    @foreach(config('smartads.placements') as $p_)
-                        <option value="{{ $p_ }}" @selected(old('placement', $ad->placement ?? '') === $p_)>{{ $p_ }}</option>
-                    @endforeach
-                </select>
-            </div>
-        </div>
-
-        <div class="row g-3 mt-1">
-            <div class="col-md-6">
-                <label class="form-label fw-semibold">صورة الإعلان</label>
-                <input type="file" name="image" class="form-control" accept="image/*">
-                @if(!empty($ad?->image_url))
-                    <div class="mt-2">
-                        <img src="{{ $ad->image_url }}" style="height:70px;border-radius:8px;object-fit:cover">
-                        <small class="d-block text-muted">الصورة الحالية</small>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label fw-bold">العنوان الديناميكي <small class="text-info">(استخدم @{{user_name}} لاسم العميل)</small></label>
+                        <input type="text" name="title" class="form-control form-control-lg text-right" value="{{ old('title', $ad->title ?? '') }}" required placeholder="مثال: مرحباً @{{user_name}}، عرض خاص لك!">
                     </div>
-                @endif
-            </div>
-            <div class="col-md-6" id="video-fields" style="display:none">
-                <label class="form-label fw-semibold">ملف الفيديو (mp4/webm، أقصى 20MB)</label>
-                <input type="file" name="video_file" class="form-control" accept="video/*">
-                <label class="form-label fw-semibold mt-2">أو رابط فيديو خارجي (YouTube/Vimeo)</label>
-                <input type="text" name="video_url" class="form-control"
-                       value="{{ old('video_url', !empty($ad?->video) && str_starts_with($ad->video,'http') ? $ad->video : '') }}"
-                       placeholder="https://...">
-            </div>
-        </div>
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label fw-bold">الوصف / نص الإشعار</label>
+                        <textarea name="sub_title" class="form-control text-right" rows="3" placeholder="اكتب تفاصيل العرض هنا...">{{ old('sub_title', $ad->sub_title ?? '') }}</textarea>
+                    </div>
 
-        <div class="row g-3 mt-1">
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">نص الزر</label>
-                <input type="text" name="button_text" class="form-control"
-                       value="{{ old('button_text', $ac['button_text'] ?? 'اعرف أكثر') }}">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">عنوان فرعي</label>
-                <input type="text" name="subtitle" class="form-control"
-                       value="{{ old('subtitle', $ac['subtitle'] ?? '') }}" placeholder="جملة قصيرة جاذبة...">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">وصف (للإعلانات الـ Native)</label>
-                <input type="text" name="description" class="form-control"
-                       value="{{ old('description', $ac['description'] ?? '') }}">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-semibold">لون الخلفية</label>
-                <div class="d-flex align-items-center gap-2">
-                    <input type="color" name="background_color" class="form-control form-control-color"
-                           value="{{ old('background_color', $ac['background_color'] ?? '#ffffff') }}" style="width:50px;height:38px">
-                    <input type="text" id="bg_hex" class="form-control form-control-sm"
-                           value="{{ old('background_color', $ac['background_color'] ?? '#ffffff') }}">
-                </div>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-semibold">لون النص</label>
-                <div class="d-flex align-items-center gap-2">
-                    <input type="color" name="text_color" class="form-control form-control-color"
-                           value="{{ old('text_color', $ac['text_color'] ?? '#212121') }}" style="width:50px;height:38px">
-                    <input type="text" id="txt_hex" class="form-control form-control-sm"
-                           value="{{ old('text_color', $ac['text_color'] ?? '#212121') }}">
+                    <div class="col-md-4">
+                        <label class="form-label">نوع الإعلان (الظهور)</label>
+                        <select name="ad_type" id="ad_type" class="form-control select2">
+                            <option value="banner" @selected($ad?->ad_type == 'banner')>بنر داخلي</option>
+                            <option value="popup" @selected($ad?->ad_type == 'popup')>نافذة منبثقة</option>
+                            <option value="notification" @selected($ad?->ad_type == 'notification')>إشعار خارجي (Push)</option>
+                            <option value="carousel" @selected($ad?->ad_type == 'carousel')>قصص (Stories)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">مكان الظهور</label>
+                        <input type="text" name="placement" class="form-control text-right" value="{{ $ad->placement ?? 'home' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">نص الزر</label>
+                        <input type="text" name="button_text" class="form-control text-right" value="{{ $ad->button_text ?? 'عرض الآن' }}">
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-</div>
 
-{{-- ══ القسم 2: الإجراء التفاعلي ══════════════════════════════ --}}
-<div class="card mb-3">
-    <div class="card-header d-flex align-items-center justify-content-between">
-        <h5 class="mb-0"><i class="tio-flash-outlined mr-2 text-warning"></i>الإجراء التفاعلي (Action)</h5>
-        <small class="text-muted">هذا هو العمل الذي يحدث عند ضغط المستخدم على الإعلان</small>
-    </div>
-    <div class="card-body">
-        <div class="row g-3 mb-3">
-            @php $allTypes = \Modules\SmartAds\app\Services\ActionResolverService::supportedTypes(); @endphp
-            @foreach($allTypes as $groupKey => $groupTypes)
-                <div class="col-md-4">
-                    <div class="card border h-100 action-group-card" data-group="{{ $groupKey }}">
-                        <div class="card-header py-2" style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#555">
-                            @php
-                                $groupIcons = [
-                                    'internal_navigation' => '🧭',
-                                    'social_follow'       => '👥',
-                                    'social_interact'     => '❤️',
-                                    'contact'             => '📱',
-                                    'interactive'         => '⚡',
-                                    'external_media'      => '🌐',
-                                ];
-                            @endphp
-                            {{ $groupIcons[$groupKey] ?? '•' }} {{ str_replace('_', ' ', $groupKey) }}
+        {{-- 2. محرك الإجراءات الذكي (Action Engine) --}}
+        <div class="card mb-3 shadow-sm border-right-warning">
+            <div class="card-header bg-warning-light">
+                <h5 class="mb-0 text-warning"><i class="tio-flash-outlined mr-2"></i>محرك الإجراءات (Action Engine)</h5>
+            </div>
+            <div class="card-body">
+                {{-- أزرار التبويبات الرئيسية --}}
+                <ul class="nav nav-pills mb-4 enterprise-tabs" id="action-tabs-list" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-toggle="pill" data-bs-toggle="pill" href="#cat-nav" role="tab">🧭 التنقل</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-toggle="pill" data-bs-toggle="pill" href="#cat-gamify" role="tab">🎁 الألعاب والجوائز</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-toggle="pill" data-bs-toggle="pill" href="#cat-social" role="tab">👥 التواصل الاجتماعي</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-toggle="pill" data-bs-toggle="pill" href="#cat-comm" role="tab">📱 الاتصال المباشر</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-toggle="pill" data-bs-toggle="pill" href="#cat-advanced" role="tab">🚀 خيارات متقدمة</a>
+                    </li>
+                </ul>
+
+                <div class="tab-content p-3 border rounded bg-white shadow-none text-right">
+                    {{-- التنقل --}}
+                    <div class="tab-pane fade show active" id="cat-nav" role="tabpanel">
+                        <div class="row g-2">
+                            @foreach(['product' => 'تفاصيل المنتج', 'category' => 'قائمة التصنيفات', 'brand' => 'صفحة الماركة', 'flash_deals' => 'عروض الفلاش', 'wallet' => 'محفظتي', 'order_tracking' => 'تتبع الطلب'] as $val => $lbl)
+                                <div class="col-md-4 mb-2">
+                                    <div class="action-selector {{ $currentActionType == $val ? 'active' : '' }}" data-type="{{ $val }}" onclick="setEnterpriseAction('{{ $val }}', this)">{{ $lbl }}</div>
+                                </div>
+                            @endforeach
                         </div>
-                        <div class="card-body py-2 px-2">
-                            @foreach($groupTypes as $typeVal => $typeLabel)
-                                <div class="form-check action-type-option mb-1">
-                                    <input class="form-check-input action-type-radio" type="radio"
-                                           name="action_type" id="at_{{ $typeVal }}"
-                                           value="{{ $typeVal }}"
-                                           {{ old('action_type', $currentActionType) === $typeVal ? 'checked' : '' }}>
-                                    <label class="form-check-label small" for="at_{{ $typeVal }}">
-                                        {{ $typeLabel }}
-                                    </label>
+                    </div>
+
+                    {{-- الألعاب --}}
+                    <div class="tab-pane fade" id="cat-gamify" role="tabpanel">
+                        <div class="row g-2">
+                            @foreach(['scratch_card' => 'امسح واربح', 'spin_wheel' => 'عجلة الحظ', 'countdown' => 'عداد الاستعجال'] as $val => $lbl)
+                                <div class="col-md-4 mb-2">
+                                    <div class="action-selector {{ $currentActionType == $val ? 'active' : '' }}" data-type="{{ $val }}" onclick="setEnterpriseAction('{{ $val }}', this)">{{ $lbl }}</div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- التواصل الاجتماعي --}}
+                    <div class="tab-pane fade" id="cat-social" role="tabpanel">
+                         <div class="row g-2">
+                            @foreach(['facebook_follow' => 'متابعة فيسبوك', 'instagram_follow' => 'متابعة إنستغرام', 'tiktok_follow' => 'متابعة تيك توك', 'youtube_subscribe' => 'اشتراك يوتيوب', 'telegram_join' => 'انضمام تيليجرام'] as $val => $lbl)
+                                <div class="col-md-4 mb-2">
+                                    <div class="action-selector {{ $currentActionType == $val ? 'active' : '' }}" data-type="{{ $val }}" onclick="setEnterpriseAction('{{ $val }}', this)">{{ $lbl }}</div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- الاتصال --}}
+                    <div class="tab-pane fade" id="cat-comm" role="tabpanel">
+                        <div class="row g-2">
+                            @foreach(['whatsapp_chat' => 'محادثة واتساب', 'call_phone' => 'اتصال هاتفي', 'save_contact' => 'حفظ جهة الاتصال'] as $val => $lbl)
+                                <div class="col-md-4 mb-2">
+                                    <div class="action-selector {{ $currentActionType == $val ? 'active' : '' }}" data-type="{{ $val }}" onclick="setEnterpriseAction('{{ $val }}', this)">{{ $lbl }}</div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- متقدم --}}
+                    <div class="tab-pane fade" id="cat-advanced" role="tabpanel">
+                         <div class="row g-2">
+                            @foreach(['external_url' => 'فتح رابط خارجي', 'apply_coupon' => 'تطبيق كوبون تلقائي', 'copy_to_clipboard' => 'نسخ نص للحافظة', 'survey' => 'استبيان سريع'] as $val => $lbl)
+                                <div class="col-md-4 mb-2">
+                                    <div class="action-selector {{ $currentActionType == $val ? 'active' : '' }}" data-type="{{ $val }}" onclick="setEnterpriseAction('{{ $val }}', this)">{{ $lbl }}</div>
                                 </div>
                             @endforeach
                         </div>
                     </div>
                 </div>
-            @endforeach
-        </div>
 
-        <div id="action-fields-wrapper">
-            {{-- بقية الحقول الديناميكية للإجراءات كما هي --}}
-        </div>
-    </div>
-</div>
+                <input type="hidden" name="action_type" id="final_action_type" value="{{ $currentActionType }}">
 
-{{-- ══ القسم 3: الجمهور المستهدف (تصميم محسّن) ══════════════════════════ --}}
-<div class="card mb-3 border-0 shadow-sm">
-    <div class="card-header bg-primary text-white">
-        <h5 class="mb-0"><i class="tio-user-list mr-2"></i>الجمهور المستهدف (اختياري)</h5>
-        <small class="text-white-50">حدد شريحة محددة لإرسال الإعلان إليها. اتركه "الجميع" للإرسال لكل المستخدمين.</small>
-    </div>
-    <div class="card-body">
-        <div class="row g-3 align-items-end">
-            <div class="col-md-4">
-                <label class="form-label fw-semibold"><i class="tio-folder-outlined mr-1"></i>نوع الجمهور</label>
-                <select name="target_type" id="targetType" class="form-control form-select-lg">
-                    <option value="all" {{ $targetType === 'all' ? 'selected' : '' }}>👥 الجميع</option>
-                    <option value="customer" {{ $targetType === 'customer' ? 'selected' : '' }}>👤 عميل محدد</option>
-                    <option value="product" {{ $targetType === 'product' ? 'selected' : '' }}>🛒 مشتري منتج</option>
-                    <option value="category" {{ $targetType === 'category' ? 'selected' : '' }}>📂 مهتم بقسم</option>
-                </select>
-            </div>
+                {{-- الحقول الديناميكية --}}
+                <div id="dynamic-action-fields" class="mt-4 p-3 bg-light border-dashed rounded text-right">
+                    {{-- المنتج --}}
+                    <div class="action-field-group" id="field-product" style="display:none">
+                        <label class="form-label fw-bold">اختر المنتج المستهدف</label>
+                        <select name="product_id" class="form-control select2-ajax-products">
+                            @if($ad && isset($ac['id']) && $currentActionType == 'product')
+                                <option value="{{ $ac['id'] }}" selected>{{ $ad->product?->name ?? 'منتج مختار' }}</option>
+                            @endif
+                        </select>
+                    </div>
 
-            <div class="col-md-6" id="customerSection" style="display:none">
-                <label class="form-label fw-semibold"><i class="tio-search mr-1"></i>اختر العميل</label>
-                <div class="input-group">
-                    <span class="input-group-text bg-white"><i class="tio-user-outlined"></i></span>
-                    <select class="form-control select2-ajax" id="customerSelect"
-                            data-ajax-url="{{ route('admin.smartads.search-users') }}"
-                            data-placeholder="ابحث عن عميل بالاسم أو البريد أو الهاتف..."
-                            style="width:100%">
-                        @if(isset($selectedUsers) && $selectedUsers->isNotEmpty())
-                            @foreach($selectedUsers as $user)
-                                <option value="{{ $user->id }}" selected>
-                                    {{ $user->f_name }} {{ $user->l_name }} ({{ $user->email ?? $user->phone }})
-                                </option>
+                    {{-- القسم --}}
+                    <div class="action-field-group" id="field-category" style="display:none">
+                        <label class="form-label fw-bold">اختر القسم المستهدف</label>
+                        <select name="category_id" class="form-control select2">
+                            @foreach(\App\Models\Category::where('position', 0)->get() as $category)
+                                <option value="{{ $category->id }}" @selected(isset($ac['id']) && $ac['id'] == $category->id)>{{ $category->name }}</option>
                             @endforeach
-                        @endif
+                        </select>
+                    </div>
+
+                    {{-- الهاتف والاتصال --}}
+                    <div class="action-field-group" id="field-whatsapp" style="display:none">
+                        <label class="form-label fw-bold">رقم الهاتف (مع كود الدولة مثل +966)</label>
+                        <input type="text" name="wa_phone" class="form-control text-right" value="{{ $ac['phone'] ?? '' }}" placeholder="+966...">
+                    </div>
+
+                    {{-- الروابط والمعرفات --}}
+                    <div class="action-field-group" id="field-url" style="display:none">
+                        <label class="form-label fw-bold">الرابط أو معرف الحساب (URL / Username)</label>
+                        <input type="text" name="external_url" class="form-control text-right" value="{{ $ac['url'] ?? $ac['id'] ?? '' }}" placeholder="https://... أو اسم الحساب">
+                    </div>
+
+                    {{-- الكوبونات والجوائز --}}
+                    <div class="action-field-group" id="field-coupon" style="display:none">
+                        <label class="form-label fw-bold">كود الكوبون أو قيمة الجائزة</label>
+                        <input type="text" name="coupon_code" class="form-control text-uppercase text-right" value="{{ $ac['coupon'] ?? $ac['countdown'] ?? '' }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- 3. الاستهداف المتقدم --}}
+        <div class="card mb-3 shadow-sm border-right-success">
+            <div class="card-header bg-success-light text-right">
+                <h5 class="mb-0 text-success"><i class="tio-filter-list mr-2"></i>الاستهداف الذكي (الجمهور)</h5>
+            </div>
+            <div class="card-body text-right">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">شريحة الجمهور المستهدفة</label>
+                        <select name="targeting_config[segment]" class="form-control">
+                            <option value="all" @selected(($targeting['segment'] ?? '') == 'all')>جميع المستخدمين</option>
+                            <option value="abandoned_cart" @selected(($targeting['segment'] ?? '') == 'abandoned_cart')>سلات مهملة</option>
+                            <option value="vip_customers" @selected(($targeting['segment'] ?? '') == 'vip_customers')>العملاء المميزون (VIP)</option>
+                            <option value="inactive_30d" @selected(($targeting['segment'] ?? '') == 'inactive_30d')>غير نشط منذ 30 يوم</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">الاستهداف الجغرافي (الدول)</label>
+                        <input type="text" name="targeting_config[geo]" class="form-control text-right" placeholder="SA, AE, EG" value="{{ $targeting['geo'] ?? '' }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- الجانب الأيسر --}}
+    <div class="col-lg-4">
+        <div class="card mb-3 shadow-sm border-right-firebase">
+            <div class="card-header bg-firebase-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 text-firebase">إعدادات Firebase V1</h5>
+            </div>
+            <div class="card-body text-right">
+                <div class="mb-3">
+                    <label class="form-label">الأولوية</label>
+                    <select name="firebase_payload[priority]" class="form-control">
+                        <option value="high" @selected(($firebase['priority'] ?? '') == 'high')>عالية (إرسال فوري)</option>
+                        <option value="normal" @selected(($firebase['priority'] ?? '') == 'normal')>عادية</option>
                     </select>
                 </div>
-                <input type="hidden" name="target_value[customer_id]" id="customerId"
-                       value="{{ $targetValue['customer_id'] ?? '' }}">
-                <small class="text-muted">ابحث عن العميل واختره من القائمة المنسدلة.</small>
-            </div>
-
-            <div class="col-md-6" id="productSection" style="display:none">
-                <label class="form-label fw-semibold"><i class="tio-shopping-cart-outlined mr-1"></i>اختر المنتج</label>
-                <select class="form-control select2-ajax" id="productSelect"
-                        data-ajax-url="{{ route('admin.smartads.search-products') }}"
-                        data-placeholder="ابحث عن منتج...">
-                </select>
-                <input type="hidden" name="target_value[product_id]" id="productId"
-                       value="{{ $targetValue['product_id'] ?? '' }}">
-            </div>
-
-            <div class="col-md-4" id="categorySection" style="display:none">
-                <label class="form-label fw-semibold"><i class="tio-category-outlined mr-1"></i>اختر القسم</label>
-                <select name="target_value[category_id]" class="form-control form-select-lg">
-                    <option value="">-- اختر --</option>
-                    @foreach(($categories ?? []) as $cat)
-                        <option value="{{ $cat->id }}"
-                            {{ ($targetValue['category_id'] ?? '') == $cat->id ? 'selected' : '' }}>
-                            {{ $cat->name }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-        </div>
-
-        <div class="mt-3 d-flex align-items-center">
-            <button type="button" id="previewTargetBtn" class="btn btn-outline-info btn-sm me-2">
-                <i class="tio-eye mr-1"></i> معاينة العدد
-            </button>
-            <span id="previewResult" class="text-muted ms-2 small"></span>
-        </div>
-    </div>
-</div>
-
-{{-- ══ القسم 4: الاستهداف والجدولة (الأصلي) ══════════════════════════ --}}
-<div class="row g-3">
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header"><h6 class="mb-0"><i class="tio-filter-list mr-2"></i>الاستهداف</h6></div>
-            <div class="card-body">
-                <div class="row g-2">
-                    <div class="col-12">
-                        <label class="form-label small fw-semibold">القسم المستهدف</label>
-                        <select name="target_category_id" class="form-control form-control-sm">
-                            <option value="">— الكل —</option>
-                            @foreach(($categories ?? []) as $cat)
-                                <option value="{{ $cat->id }}"
-                                    @selected(($ad->target_category_id ?? null) == $cat->id)>
-                                    {{ $cat->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label small fw-semibold">المنطقة الجغرافية</label>
-                        <input type="text" name="target_region" class="form-control form-control-sm"
-                               value="{{ $ad->target_region ?? '' }}" placeholder="SA, AE, EG ...">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label small fw-semibold">الجهاز</label>
-                        <select name="device_type" class="form-control form-control-sm">
-                            @foreach(config('smartads.device_types') as $d)
-                                <option value="{{ $d }}" @selected(($ad->device_type ?? 'all') === $d)>{{ $d }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                <div class="mb-3">
+                    <label class="form-label">صوت الإشعار</label>
+                    <select name="firebase_payload[sound]" class="form-control">
+                        <option value="default" @selected(($firebase['sound'] ?? '') == 'default')>الافتراضي</option>
+                        <option value="sale_shout.mp3" @selected(($firebase['sound'] ?? '') == 'sale_shout.mp3')>صوت التخفيضات</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">معرف القناة</label>
+                    <input type="text" name="firebase_payload[channel_id]" class="form-control text-right" value="{{ $firebase['channel_id'] ?? 'marketing_channel' }}">
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header"><h6 class="mb-0"><i class="tio-calendar-note mr-2"></i>الجدولة الزمنية</h6></div>
-            <div class="card-body">
-                <div class="row g-2">
-                    <div class="col-md-6">
-                        <label class="form-label small fw-semibold">تاريخ البدء</label>
-                        <input type="datetime-local" name="start_at" class="form-control form-control-sm"
-                               value="{{ old('start_at', isset($ad->start_at) ? $ad->start_at->format('Y-m-d\TH:i') : '') }}">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label small fw-semibold">تاريخ الانتهاء</label>
-                        <input type="datetime-local" name="end_at" class="form-control form-control-sm"
-                               value="{{ old('end_at', isset($ad->end_at) ? $ad->end_at->format('Y-m-d\TH:i') : '') }}">
-                    </div>
+        <div class="card mb-3 shadow-sm border-right-info">
+            <div class="card-header bg-info-light text-right">
+                <h5 class="mb-0 text-info">الجدولة الزمنية</h5>
+            </div>
+            <div class="card-body text-right">
+                <div class="mb-3">
+                    <label class="form-label">تاريخ البدء</label>
+                    <input type="datetime-local" name="start_at" class="form-control" value="{{ $ad && $ad->start_at ? $ad->start_at->format('Y-m-d\TH:i') : '' }}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">تاريخ الانتهاء</label>
+                    <input type="datetime-local" name="end_at" class="form-control" value="{{ $ad && $ad->end_at ? $ad->end_at->format('Y-m-d\TH:i') : '' }}">
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header text-right">الوسائط</div>
+            <div class="card-body text-center">
+                @if($ad?->image_url)
+                    <img src="{{ $ad->image_url }}" class="img-fluid rounded border mb-3" style="max-height: 120px">
+                @else
+                    <div class="p-4 border rounded mb-3 bg-light"><i class="tio-image fa-3x text-muted"></i></div>
+                @endif
+                <input type="file" name="image" class="form-control" accept="image/*">
+                <div class="mt-4 text-right">
+                    <label class="form-label">لون التنسيق</label>
+                    <input type="color" name="background_color" class="form-control w-100" value="{{ $ac['background_color'] ?? '#377dff' }}">
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-{{-- ══ القسم 5: اختبار A/B ════════════════════════════════ --}}
-<div class="card mt-3">
-    <div class="card-header">
-        <h6 class="mb-0"><i class="tio-split-horizontal mr-2"></i>اختبار A/B (اختياري)</h6>
-    </div>
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-6">
-                <label class="form-label small fw-semibold">الإعلان الأب (اجعل هذا متغيراً تجريبياً)</label>
-                <select name="parent_id" class="form-control form-control-sm">
-                    <option value="">— إعلان مستقل —</option>
-                    @foreach(($parents ?? []) as $par)
-                        <option value="{{ $par->id }}" @selected(($ad->parent_id ?? null) == $par->id)>
-                            #{{ $par->id }} — {{ $par->title }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label small fw-semibold">تسمية المتغير</label>
-                <select name="ab_variant" class="form-control form-control-sm">
-                    <option value="">—</option>
-                    <option value="A" @selected(($ad->ab_variant ?? '') === 'A')>A</option>
-                    <option value="B" @selected(($ad->ab_variant ?? '') === 'B')>B</option>
-                    <option value="C" @selected(($ad->ab_variant ?? '') === 'C')>C</option>
-                </select>
-            </div>
-        </div>
-    </div>
-</div>
+<style>
+    .text-right { text-align: right !important; }
+    .border-right-primary { border-right: 5px solid #377dff !important; }
+    .border-right-warning { border-right: 5px solid #ffca28 !important; }
+    .border-right-success { border-right: 5px solid #00c9db !important; }
+    .border-right-info { border-right: 5px solid #00c9db !important; }
+    .border-right-firebase { border-right: 5px solid #f6820c !important; }
+    .enterprise-tabs .nav-link { font-size: 13px; font-weight: bold; background: #eee; margin-left: 5px; color: #555; border-radius: 8px; border: 0; }
+    .enterprise-tabs .nav-link.active { background: #377dff !important; color: white !important; }
+    .action-selector { padding: 12px; border: 1px solid #ddd; border-radius: 8px; text-align: center; cursor: pointer; transition: 0.2s; background: white; font-weight: bold; font-size: 13px; }
+    .action-selector:hover { border-color: #377dff; background: #f0f7ff; }
+    .action-selector.active { background: #377dff; color: white; border-color: #377dff; box-shadow: 0 4px 10px rgba(55, 125, 255, 0.3); }
+    .border-dashed { border: 2px dashed #eee; }
+</style>
 
-@push('script')
 <script>
-(function() {
-    const adTypeEl = document.getElementById('ad_type');
-    const videoFields = document.getElementById('video-fields');
+    function setEnterpriseAction(type, el) {
+        $('.action-selector').removeClass('active');
+        if(el) {
+            $(el).addClass('active');
+        } else {
+            $(`.action-selector[data-type="${type}"]`).addClass('active');
+        }
 
-    function syncVideo() {
-        videoFields.style.display = adTypeEl.value === 'video' ? '' : 'none';
-    }
-    adTypeEl.addEventListener('change', syncVideo);
-    syncVideo();
-
-    const radios  = document.querySelectorAll('.action-type-radio');
-    const groups  = document.querySelectorAll('.action-fields-group');
-
-    function showFields(selectedType) {
-        groups.forEach(g => {
-            const types = g.dataset.types ? g.dataset.types.split(',') : [];
-            g.style.display = types.includes(selectedType) ? '' : 'none';
-        });
-    }
-
-    radios.forEach(r => {
-        r.addEventListener('change', () => showFields(r.value));
-    });
-
-    const checked = document.querySelector('.action-type-radio:checked');
-    showFields(checked ? checked.value : '');
-
-    const bgColor  = document.querySelector('[name="background_color"]');
-    const bgHex    = document.getElementById('bg_hex');
-    const txtColor = document.querySelector('[name="text_color"]');
-    const txtHex   = document.getElementById('txt_hex');
-
-    if (bgColor && bgHex) {
-        bgColor.addEventListener('input', () => bgHex.value = bgColor.value);
-        bgHex.addEventListener('input', () => { if (/^#[0-9a-f]{6}$/i.test(bgHex.value)) bgColor.value = bgHex.value; });
-    }
-    if (txtColor && txtHex) {
-        txtColor.addEventListener('input', () => txtHex.value = txtColor.value);
-        txtHex.addEventListener('input', () => { if (/^#[0-9a-f]{6}$/i.test(txtHex.value)) txtColor.value = txtHex.value; });
+        $('#final_action_type').val(type);
+        $('.action-field-group').hide();
+        
+        if (type === 'product') {
+            $('#field-product').fadeIn();
+        } else if (type === 'category') {
+            $('#field-category').fadeIn();
+        } else if (['whatsapp_chat', 'call_phone'].includes(type)) {
+            $('#field-whatsapp').fadeIn();
+        } else if (type.includes('follow') || type.includes('subscribe') || type.includes('join')) {
+            $('#field-url').fadeIn();
+        } else if (['external_url', 'survey', 'copy_to_clipboard', 'inapp_browser'].includes(type)) {
+            $('#field-url').fadeIn();
+        } else if (['scratch_card', 'spin_wheel', 'apply_coupon', 'countdown'].includes(type)) {
+            $('#field-coupon').fadeIn();
+        }
     }
 
-    // ── الاستهداف الذكي ──────────────────────────────────────
-    const targetTypeEl = document.getElementById('targetType');
-    const customerSec  = document.getElementById('customerSection');
-    const productSec   = document.getElementById('productSection');
-    const categorySec  = document.getElementById('categorySection');
-
-    function toggleTargetSections() {
-        const val = targetTypeEl.value;
-        customerSec.style.display = val === 'customer' ? '' : 'none';
-        productSec.style.display  = val === 'product' ? '' : 'none';
-        categorySec.style.display = val === 'category' ? '' : 'none';
-    }
-    targetTypeEl.addEventListener('change', toggleTargetSections);
-    toggleTargetSections();
-
-    // تهيئة Select2 للبحث مع تنسيق النتائج
-    if (typeof $.fn.select2 !== 'undefined') {
-        $('.select2-ajax').each(function() {
-            const $sel = $(this);
-            const url = $sel.data('ajax-url');
-            $sel.select2({
+    $(document).ready(function() {
+        const initialType = $('#final_action_type').val();
+        if(initialType) {
+            setEnterpriseAction(initialType);
+        }
+        
+        if($('.select2-ajax-products').length > 0) {
+            $('.select2-ajax-products').select2({
                 ajax: {
-                    url: url,
-                    dataType: 'json',
-                    delay: 250,
-                    data: function(params) { return { q: params.term }; },
-                    processResults: function(data) { return { results: data.results }; },
-                    cache: true
-                },
-                minimumInputLength: 1,
-                placeholder: $sel.data('placeholder') || 'ابحث...',
-                language: {
-                    noResults: function() { return "لا توجد نتائج"; },
-                    searching: function() { return "جاري البحث..."; },
-                    inputTooShort: function() { return "اكتب حرفين على الأقل"; }
-                },
-                templateResult: function(item) {
-                    if (!item.id) return item.text;
-                    // عرض النتيجة بشكل منسق: الاسم + بريد إلكتروني + هاتف
-                    var html = '<div class="d-flex flex-column">';
-                    html += '<span class="fw-bold">' + item.name + '</span>';
-                    if (item.email) html += '<small class="text-muted">' + item.email + '</small>';
-                    if (item.phone) html += '<small class="text-muted">' + item.phone + '</small>';
-                    html += '</div>';
-                    return $(html);
-                },
-                templateSelection: function(item) {
-                    // عرض العنصر المختار بشكل بسيط
-                    return item.name || item.text;
+                    url: '{{ route("admin.smartads.search-products") }}',
+                    data: function (params) { return { q: params.term }; },
+                    processResults: function (data) { return { results: data.results }; }
                 }
-            }).on('select2:select', function(e) {
-                const id = e.params.data.id;
-                const targetId = $sel.attr('id') === 'customerSelect' ? 'customerId' : 'productId';
-                document.getElementById(targetId).value = id;
             });
-        });
-    }
-
-    // معاينة الجمهور
-    document.getElementById('previewTargetBtn').addEventListener('click', function() {
-        const payload = {
-            target_type: targetTypeEl.value,
-            _token: '{{ csrf_token() }}'
-        };
-        if (payload.target_type === 'customer') payload.customer_id = document.getElementById('customerId').value;
-        if (payload.target_type === 'product') payload.product_id = document.getElementById('productId').value;
-        if (payload.target_type === 'category') payload.category_id = document.querySelector('[name="target_value[category_id]"]').value;
-
-        fetch('{{ route("admin.smartads.preview-target") }}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(r => r.json())
-        .then(data => {
-            document.getElementById('previewResult').innerHTML =
-                '👥 إجمالي المستخدمين: ' + data.total_users + ' | 📱 أجهزة مسجلة: ' + data.fcm_count;
+        }
+        
+        $('#action-tabs-list a').on('click', function (e) {
+          e.preventDefault();
+          $(this).tab('show');
         });
     });
-})();
 </script>
-@endpush

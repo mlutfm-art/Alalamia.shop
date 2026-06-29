@@ -4,6 +4,8 @@ namespace Modules\SmartAds\app\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Product;
+use App\Models\Category;
 
 class SmartAd extends Model
 {
@@ -12,22 +14,36 @@ class SmartAd extends Model
     protected $table = 'smart_ads';
 
     protected $fillable = [
-        'title', 'image', 'video', 'ad_type', 'placement',
+        'title', 'sub_title', 'image', 'video', 'ad_type', 'action_type', 'placement',
         'parent_id', 'ab_variant', 'action_data', 'status',
         'clicks', 'impressions', 'target_category_id',
         'target_region', 'device_type', 'start_at', 'end_at',
+        'button_text', 'firebase_payload', 'dynamic_context',
+        'targeting_config', 'triggers_config', 'scheduling_config',
+        'sent_count', 'delivered_count', 'opened_count', 'conversion_count',
+        'is_ai_generated'
     ];
 
     protected $casts = [
-        'action_data' => 'array',
-        'status'      => 'boolean',
-        'clicks'      => 'integer',
-        'impressions' => 'integer',
-        'start_at'    => 'datetime',
-        'end_at'      => 'datetime',
+        'action_data'       => 'array',
+        'firebase_payload'  => 'array',
+        'dynamic_context'   => 'array',
+        'targeting_config'  => 'array',
+        'triggers_config'   => 'array',
+        'scheduling_config' => 'array',
+        'status'            => 'boolean',
+        'clicks'            => 'integer',
+        'impressions'       => 'integer',
+        'sent_count'        => 'integer',
+        'delivered_count'   => 'integer',
+        'opened_count'      => 'integer',
+        'conversion_count'  => 'integer',
+        'is_ai_generated'   => 'boolean',
+        'start_at'          => 'datetime',
+        'end_at'            => 'datetime',
     ];
 
-    protected $appends = ['image_url', 'video_url', 'ctr'];
+    protected $appends = ['image_url', 'video_url', 'ctr', 'conversion_rate'];
 
     /* ===================== Relations ===================== */
 
@@ -41,50 +57,8 @@ class SmartAd extends Model
         return $this->hasMany(self::class, 'parent_id');
     }
 
-    /* ===================== Scopes ===================== */
-
-    public function scopeActive($query)
-    {
-        return $query->where('status', 1)
-            ->where(fn($q) => $q->whereNull('start_at')->orWhere('start_at', '<=', now()))
-            ->where(fn($q) => $q->whereNull('end_at')->orWhere('end_at', '>=', now()));
-    }
-
-    public function scopeForPlacement($query, $placement)
-    {
-        return $query->where('placement', $placement);
-    }
-
-    public function scopeForDevice($query, ?string $device)
-    {
-        if (!$device) return $query;
-        return $query->where(fn($q) => $q->where('device_type', 'all')->orWhere('device_type', $device));
-    }
-
-    public function scopeForCategory($query, $categoryId)
-    {
-        if (!$categoryId) return $query;
-        return $query->where(fn($q) => $q->whereNull('target_category_id')->orWhere('target_category_id', $categoryId));
-    }
-
-    public function scopeForRegion($query, ?string $region)
-    {
-        if (!$region) return $query;
-        return $query->where(fn($q) => $q->whereNull('target_region')->orWhere('target_region', $region));
-    }
-
     /* ===================== Accessors ===================== */
 
-    /**
-     * صنع URL الصورة بما يلائم بنية Hostinger حيث:
-     *   - domain root = public_html/
-     *   - symlink = public_html/public/storage → public_html/storage/app/public
-     *   - URL الصحيح = APP_URL/public/storage/smartads/{filename}
-     *
-     * يدعم أيضاً:
-     *   - URL كامل (http/https) → يُعاد كما هو
-     *   - مسار يبدأ بـ upload/ → يضيف public/storage/ تلقائياً
-     */
     public function getImageUrlAttribute(): ?string
     {
         if (!$this->image) return null;
@@ -94,7 +68,6 @@ class SmartAd extends Model
     public function getVideoUrlAttribute(): ?string
     {
         if (!$this->video) return null;
-        // رابط خارجي (يوتيوب، vimeo، إلخ)
         if (filter_var($this->video, FILTER_VALIDATE_URL)) {
             return $this->video;
         }
@@ -107,56 +80,31 @@ class SmartAd extends Model
         return round(($this->clicks / $this->impressions) * 100, 2);
     }
 
-    /**
-     * بناء URL ملف مخزّن — يحل جميع حالات المسار.
-     *
-     * @param string $path     القيمة المخزّنة في DB
-     * @param string $folder   المجلد الافتراضي (مثل 'smartads')
-     */
+    public function getConversionRateAttribute(): float
+    {
+        if (!$this->clicks || $this->clicks == 0) return 0.0;
+        return round(($this->conversion_count / $this->clicks) * 100, 2);
+    }
+
     public static function buildStorageUrl(string $path, string $folder = 'smartads'): string
     {
         $base = rtrim(config('app.url', 'https://alalamia.shop'), '/');
-
-        // 1. URL كامل — أعِده كما هو
         if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
             return $path;
         }
-
         $path = ltrim($path, '/');
-
-        // 2. يبدأ بـ public/storage/ — أضف APP_URL فقط
         if (str_starts_with($path, 'public/storage/')) {
             return $base . '/' . $path;
         }
-
-        // 3. يبدأ بـ storage/ — استبدله بـ public/storage/
-        if (str_starts_with($path, 'storage/')) {
-            return $base . '/public/' . $path;
-        }
-
-        // 4. يبدأ بـ upload/ (أسلوب 6Valley القديم)
-        if (str_starts_with($path, 'upload/')) {
-            return $base . '/public/storage/' . $path;
-        }
-
-        // 5. اسم ملف فقط — ضع المجلد الافتراضي
         return $base . '/public/storage/' . $folder . '/' . $path;
     }
+    
+    /* ===================== Scopes ===================== */
 
-    /* ===================== A/B helpers ===================== */
-
-    public function pickVariant(): self
+    public function scopeActive($query)
     {
-        $children = $this->variants()->active()->get();
-        if ($children->isEmpty()) return $this;
-        return $children->random();
-    }
-
-    public function winner(): ?self
-    {
-        $all = $this->variants()->get()->push($this)
-            ->filter(fn($a) => $a->impressions > 0);
-        if ($all->isEmpty()) return null;
-        return $all->sortByDesc('ctr')->first();
+        return $query->where('status', 1)
+            ->where(fn($q) => $q->whereNull('start_at')->orWhere('start_at', '<=', now()))
+            ->where(fn($q) => $q->whereNull('end_at')->orWhere('end_at', '>=', now()));
     }
 }

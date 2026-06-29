@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_sixvalley_ecommerce/data/model/api_response.dart';
 import 'package:flutter_sixvalley_ecommerce/features/smartads/domain/models/smart_ad_model.dart';
+import 'package:flutter_sixvalley_ecommerce/features/smartads/domain/models/smart_ad_notification_model.dart';
 import 'package:flutter_sixvalley_ecommerce/features/smartads/domain/services/ad_service_interface.dart';
 
 class AdController extends ChangeNotifier {
@@ -11,13 +12,13 @@ class AdController extends ChangeNotifier {
   List<SmartAdModel> _pendingInAppBanners = [];
   List<SmartAdNotificationModel> _notifications = [];
   bool _isLoading = false;
-  bool _isNotificationLoading = false; // إضافة المتغير المفقود
+  bool _isNotificationLoading = false;
 
   List<SmartAdModel> get activeAds => _activeAds;
   List<SmartAdModel> get pendingInAppBanners => _pendingInAppBanners;
   List<SmartAdNotificationModel> get notifications => _notifications;
   bool get isLoading => _isLoading;
-  bool get isNotificationLoading => _isNotificationLoading; // إضافة الـ getter المفقود
+  bool get isNotificationLoading => _isNotificationLoading;
 
   Future<void> getActiveAds({required String device, required String region, int? categoryId, int? userId}) async {
     _isLoading = true;
@@ -62,7 +63,7 @@ class AdController extends ChangeNotifier {
   Future<void> trackClick(int adId) async => await adService.trackClick(adId);
 
   Future<void> getNotifications(int? userId) async {
-    _isNotificationLoading = true; // تفعيل حالة التحميل
+    _isNotificationLoading = true;
     notifyListeners();
     
     try {
@@ -82,7 +83,7 @@ class AdController extends ChangeNotifier {
       debugPrint("SmartAds Notifications Error: $e");
     }
     
-    _isNotificationLoading = false; // إيقاف حالة التحميل
+    _isNotificationLoading = false;
     notifyListeners();
   }
 
