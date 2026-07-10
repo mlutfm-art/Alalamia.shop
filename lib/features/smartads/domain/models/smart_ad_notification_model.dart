@@ -1,38 +1,39 @@
-import 'package:flutter_sixvalley_ecommerce/features/smartads/domain/models/smart_ad_model.dart';
-
 class SmartAdNotificationModel {
   int? id;
   String? title;
   String? body;
   String? image;
-  String? actionType;
-  Map<String, dynamic>? actionPayload;
   bool? isRead;
   DateTime? createdAt;
+  ActionEngine? actionEngine;
 
-  SmartAdNotificationModel({
-    this.id,
-    this.title,
-    this.body,
-    this.image,
-    this.actionType,
-    this.actionPayload,
-    this.isRead,
-    this.createdAt,
-  });
+  SmartAdNotificationModel({this.id, this.title, this.body, this.image, this.isRead, this.createdAt, this.actionEngine});
 
-  SmartAdNotificationModel.fromJson(Map<String, dynamic> json) {
-    id = int.tryParse(json['id']?.toString() ?? '');
-    title = json['title'];
-    body = json['body'];
-    image = json['image_url'] ?? json['image'];
-    actionType = json['action_type'];
-    if (json['action_data'] != null) {
-      actionPayload = json['action_data'] is String 
-        ? null // Add decoding logic if needed
-        : json['action_data'];
-    }
-    isRead = json['is_read'] == 1 || json['is_read'] == true;
-    createdAt = json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null;
+  factory SmartAdNotificationModel.fromJson(Map<String, dynamic> json) {
+    return SmartAdNotificationModel(
+      id: json['id'] != null ? int.tryParse(json['id'].toString()) : null,
+      title: json['title']?.toString(),
+      body: json['body']?.toString(),
+      image: json['image']?.toString(),
+      isRead: json['is_read'] == null ? null : (json['is_read'] == true || json['is_read'].toString() == '1'),
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
+      actionEngine: json['action_engine'] != null ? ActionEngine.fromJson(json['action_engine']) : null,
+    );
+  }
+}
+
+class ActionEngine {
+  String? type;
+  Map<String, dynamic>? payload;
+  String? deepLink;
+
+  ActionEngine({this.type, this.payload, this.deepLink});
+
+  factory ActionEngine.fromJson(Map<String, dynamic> json) {
+    return ActionEngine(
+      type: json['type']?.toString(),
+      payload: json['payload'] != null ? Map<String, dynamic>.from(json['payload']) : null,
+      deepLink: json['deep_link']?.toString(),
+    );
   }
 }

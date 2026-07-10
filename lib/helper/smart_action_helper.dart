@@ -1,61 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_sixvalley_ecommerce/helper/route_healper.dart'; 
-import 'package:flutter_sixvalley_ecommerce/common/basewidget/show_custom_snakbar_widget.dart'; 
+import 'package:flutter_sixvalley_ecommerce/helper/smart_action_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:provider/provider.dart';
-import 'package:flutter_sixvalley_ecommerce/features/profile/controllers/profile_contrroller.dart';
+import 'package:share_plus/share_plus.dart';
 
 class SmartActionHelper {
-  static Future<void> performAction(BuildContext context, Map<String, dynamic>? action) async {
-    if (action == null || action['type'] == 'none') return;
-
-    final String type = action['type'] ?? action['action_type'] ?? '';
-    final Map<String, dynamic> payload = action['payload'] ?? {};
-    final String? deepLink = action['deep_link'];
-    final String? fallbackUrl = action['fallback_url'];
-
-    try {
-      switch (type) {
-        case 'product':
-          int? id = int.tryParse(payload['product_id']?.toString() ?? payload['id']?.toString() ?? '');
-          if (id != null) RouterHelper.getProductDetailsRoute(productId: id);
-          break;
-
-        case 'category':
-          int? id = int.tryParse(payload['category_id']?.toString() ?? payload['id']?.toString() ?? '');
-          if (id != null) RouterHelper.getBrandCategoryRoute(id: id, isBrand: false);
-          break;
-
-        case 'wallet':
-          RouterHelper.getWalletRoute();
-          break;
-
-        case 'order_tracking':
-          if (payload['order_id'] != null) {
-            RouterHelper.getOrderDetailsScreenRoute(orderId: int.parse(payload['order_id'].toString()));
-          }
-          break;
-
-        default:
-          if (deepLink != null || fallbackUrl != null) {
-             final Uri uri = Uri.parse(deepLink ?? fallbackUrl!);
-             if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-             }
-          }
-      }
-    } catch (e) {
-      debugPrint("Action Engine Error: $e");
-    }
-  }
-
-  static String processDynamicText(BuildContext context, String text) {
-    try {
-      final profile = Provider.of<ProfileController>(context, listen: false).userInfoModel;
-      if (profile == null) return text;
-      return text.replaceAll('{{user_name}}', '${profile.fName} ${profile.lName}');
-    } catch (e) {
-      return text;
+  static Future<void> handleAction(Map<String,dynamic>? action, BuildContext context) async {
+    if (action == null) return;
+    final type = action['type']?.toString() ?? action['action_type']?.toString();
+    final payload = action['payload'] ?? {};
+    switch(type) {
+      case 'product':
+        // navigate to product
+        break;
+      case 'category':
+        break;
+      case 'url':
+        final url = payload['url']?.toString() ?? action['deep_link']?.toString();
+        if (url != null && await canLaunchUrl(Uri.parse(url))) { await launchUrl(Uri.parse(url)); }
+        break;
+      case 'share_content':
+      case 'share':
+        Share.share(payload['text']?.toString() ?? '');
+        break;
+      case 'open_whatsapp':
+        final phone = payload['phone']?.toString();
+        if (phone != null) launchUrl(Uri.parse('https://wa.me/$phone'));
+        break;
+      // add many other cases as needed (placeholder)
+      default:
+        // default deep link handling
+        final deep = action['deep_link']?.toString();
+        if (deep != null) {
+          if (await canLaunchUrl(Uri.parse(deep))) await launchUrl(Uri.parse(deep));
+        }
     }
   }
 }
