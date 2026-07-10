@@ -22,6 +22,7 @@ import 'package:flutter_sixvalley_ecommerce/features/order/controllers/order_con
 import 'package:flutter_sixvalley_ecommerce/features/order_details/controllers/order_details_controller.dart';
 import 'package:flutter_sixvalley_ecommerce/features/prediction/controllers/prediction_controller.dart';
 import 'package:flutter_sixvalley_ecommerce/features/smartads/controllers/ad_controller.dart';
+import 'package:flutter_sixvalley_ecommerce/features/smartads/controllers/ad_admin_controller.dart';
 import 'package:flutter_sixvalley_ecommerce/features/botcenter/controllers/bot_controller.dart';
 import 'package:flutter_sixvalley_ecommerce/features/product/controllers/product_controller.dart';
 import 'package:flutter_sixvalley_ecommerce/features/product/controllers/seller_product_controller.dart';
@@ -143,6 +144,7 @@ Future<void> main() async {
     ChangeNotifierProvider(create: (context) => di.sl<RestockController>()),
     ChangeNotifierProvider(create: (context) => di.sl<PredictionController>()),
     ChangeNotifierProvider(create: (context) => di.sl<AdController>()),
+    ChangeNotifierProvider(create: (context) => di.sl<AdAdminController>()),
     ChangeNotifierProvider(create: (context) => di.sl<BotController>()),
   ],
     child: MyApp(body: body),
